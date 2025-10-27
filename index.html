@@ -457,40 +457,28 @@
         
         // --- Fungsi untuk memperbarui status berdasarkan cache data ---
         function checkDeviceStatus() {
-            if (!latestRealtimeData) {
-                return;
-            }
-            
-            // LOGIKA BARU UNTUK MENGATASI CLOCK DRIFT
+            // Logika Sederhana: Hanya bisa ONLINE jika Firebase update kurang dari 2 menit
             const timeSinceLastFirebaseUpdate = Date.now() - lastFirebaseUpdateTimestamp;
             const twoMinutes = 120000; // 2 menit dalam milidetik
 
-            const data = latestRealtimeData;
-            const timeDiff = Date.now() - data.last_seen;
-
-            // Debug log yang lebih jelas:
-            console.log(`[STATUS CHECK] TimeSinceUpdate: ${timeSinceLastFirebaseUpdate} ms. Diff (PC-ESP): ${timeDiff} ms`);
+            // DEBUG LOG
+            console.log(`[STATUS CHECK] TimeSinceUpdate: ${timeSinceLastFirebaseUpdate} ms. Threshold: ${twoMinutes} ms`);
             
             
             // KONDISI UTAMA: LOGIKA TIMEOUT
-            // Kita gunakan variabel 'lastFirebaseUpdateTimestamp' yang di-reset HANYA saat data baru masuk.
+            // Jika sudah lebih dari 2 menit sejak Firebase Listener terakhir diaktifkan
             if (timeSinceLastFirebaseUpdate > twoMinutes) {
-                // Jika sudah lebih dari 2 menit sejak Firebase Listener terakhir diaktifkan (ESP mengirim data)
                 elStatusPerangkat.textContent = "OFFLINE";
                 elStatusPerangkat.className = "status-value offline";
-                
-                // Karena kita tahu ESP mati, kita update juga last_seen agar tidak menampilkan waktu yang maju.
-                // NOTE: Kita tidak bisa update elemen ini secara real-time tanpa data baru, jadi biarkan saja.
-                
             } else {
                 // Jika masih dalam batas 2 menit sejak data terakhir diterima
                 elStatusPerangkat.textContent = "ONLINE";
                 elStatusPerangkat.className = "status-value online";
             }
             
-            // Update Waktu Terakhir Dilihat (menggunakan data yang terakhir diterima)
-            if (data.last_seen) {
-                elLastSeen.textContent = formatWaktuLengkapWIB(data.last_seen, true);
+            // Update Waktu Terakhir Dilihat (hanya jika ada data yang dicache)
+            if (latestRealtimeData && latestRealtimeData.last_seen) {
+                elLastSeen.textContent = formatWaktuLengkapWIB(latestRealtimeData.last_seen, true);
             } else {
                 elLastSeen.textContent = "-";
             }
@@ -514,25 +502,24 @@
                     if (!snapshot.exists()) {
                         console.log("Tidak ada data realtime. Setting semua status ke OFFLINE/MATI.");
                         
-                        // Set status OFFLINE
-                        elStatusPerangkat.textContent = "OFFLINE";
-                        elStatusPerangkat.className = "status-value offline";
-                        elLastSeen.textContent = "-";
-                        
-                        // Set LED MATI
-                        updateLedStatus(elLedPanas, "MATI", 'panas');
-                        updateLedStatus(elLedDingin, "MATI", 'dingin');
-                        
+                        // Tetap OFFLINE (biarkan checkDeviceStatus yang menangani)
                         latestRealtimeData = null; // Reset cache
                         lastFirebaseUpdateTimestamp = 0; // Reset timer
-                        return; // Selesai. Tidak perlu menjalankan logika timeout.
+                        return; 
                     }
                     
                     const data = snapshot.val();
+                    const isNewData = JSON.stringify(data) !== JSON.stringify(latestRealtimeData);
+                    
                     latestRealtimeData = data; // Update cache data
                     
-                    // PENTING: Update timestamp hanya jika data baru datang dari Firebase (ESP ONLINE)
-                    lastFirebaseUpdateTimestamp = Date.now();
+                    // PENTING: Update timestamp HANYA JIKA ADA PERUBAHAN DATA (bukan hanya koneksi ulang Firebase)
+                    if (isNewData) {
+                       lastFirebaseUpdateTimestamp = Date.now();
+                    } else if (lastFirebaseUpdateTimestamp === 0) {
+                        // Jika ini adalah koneksi awal dan data ada, set timestamp pertama kali
+                        lastFirebaseUpdateTimestamp = Date.now();
+                    }
                     
                     // Update Gauge
                     if (data.suhu !== undefined) {
