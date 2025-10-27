@@ -264,14 +264,22 @@
                 font-size: 1.1rem;
             }
 
-            /* Gauge: Memaksa tata letak tetap rapi */
+            /* --- PERBAIKAN KRITIS UNTUK GAUGE --- */
             .gauge-container {
+                /* Container harus fleksibel */
+                display: flex;
+                justify-content: space-around;
+                align-items: center;
                 gap: 5px;
+                padding: 0 5px; /* Tambahkan sedikit padding horizontal */
             }
+            /* Menghilangkan batasan max-width dan menggunakan lebar 100% dari container */
+            /* Ini akan memaksa Google Charts merender seolah-olah parent-nya memiliki ukuran yang fleksibel */
             #gauge_suhu, #gauge_kelembapan {
-                 /* Memastikan Google Chart menyesuaikan ke lebar 50% */
-                width: 50%;
+                width: 100%;
                 max-width: none; 
+                /* Tinggi yang eksplisit membantu rendering chart di HP */
+                height: 180px; 
             }
             
             /* Chart & Tabel */
