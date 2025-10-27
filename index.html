@@ -617,29 +617,33 @@
                 return "-"; 
             }
             
-            const options = {
+            const optionsShort = {
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hour12: false, timeZone: 'Asia/Jakarta'
+            };
+            
+            const optionsLong = {
                 year: 'numeric',
                 month: '2-digit',
                 day: '2-digit',
                 hour: '2-digit',
                 minute: '2-digit',
-                second: isShort ? '2-digit' : undefined, // Detik hanya untuk short/last_seen
-                hour12: false, // Format 24 jam
+                hour12: false,
                 timeZone: 'Asia/Jakarta'
             };
 
-            const formatter = new Intl.DateTimeFormat('id-ID', options);
+            const formatter = new Intl.DateTimeFormat('id-ID', isShort ? optionsShort : optionsLong);
             const formatted = formatter.format(d);
 
             // Perlu manipulasi string karena format Intl.DateTimeFormat sering menghasilkan "DD/MM/YYYY, HH.MM"
             if (isShort) {
-                 // Format singkat (Status Terakhir Dilihat): 10:20:30
-                const parts = formatted.split(', ');
-                return parts[1]; // Ambil bagian waktu
+                 // Format singkat (Status Terakhir Dilihat): HH:MM:SS
+                return formatted.replace(/\s/g, '').replace(/\./g, ':'); // Membersihkan dan mengganti titik menjadi dua titik (:)
             } else {
-                 // Format panjang (Tabel Histori): 27/10/2025 10:20
+                 // Format panjang (Tabel Histori): DD/MM/YYYY HH:MM
                  const parts = formatted.split(', ');
-                 return parts[0] + ' ' + parts[1].substring(0, 5); // DD/MM/YYYY HH:MM
+                 // Menggabungkan tanggal dan waktu, memastikan waktu hanya HH:MM
+                 return parts[0] + ' ' + parts[1].substring(0, 5); 
             }
         }
         
@@ -661,4 +665,3 @@
 
 </body>
 </html>
-
