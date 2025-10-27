@@ -455,7 +455,10 @@
         
         // --- Fungsi untuk memperbarui status berdasarkan cache data ---
         function checkDeviceStatus() {
-            if (!latestRealtimeData) return;
+            if (!latestRealtimeData) {
+                // Jika cache kosong (snapshot.exists() == false), status sudah diatur di listener.
+                return;
+            }
 
             const data = latestRealtimeData;
 
@@ -464,6 +467,9 @@
                 const timeDiff = Date.now() - data.last_seen;
                 const twoMinutes = 120000; // 2 menit dalam milidetik
 
+                // DEBUG LOG: Kritis untuk melihat apakah timeDiff bertambah
+                console.log(`[STATUS CHECK] Time difference (ms): ${timeDiff}. Threshold: ${twoMinutes}`);
+                
                 if (timeDiff > twoMinutes) { 
                     elStatusPerangkat.textContent = "OFFLINE";
                     elStatusPerangkat.className = "status-value offline";
@@ -475,6 +481,7 @@
                 // Update Waktu Terakhir Dilihat
                 elLastSeen.textContent = formatWaktuLengkapWIB(data.last_seen, true); 
             } else {
+                // Jika last_seen ada, tetapi nilainya invalid (null/undefined)
                 elStatusPerangkat.textContent = "OFFLINE";
                 elStatusPerangkat.className = "status-value offline";
                 elLastSeen.textContent = "-";
@@ -494,7 +501,7 @@
             const realtimeRef = ref(db, dbPath + '/realtime');
             onValue(realtimeRef, (snapshot) => {
                 try {
-                    // PERBAIKAN LOGIKA: Jika snapshot tidak ada, set semua ke OFF
+                    // LOGIKA BARU: Jika snapshot tidak ada (ESP belum pernah kirim data atau node realtime dihapus)
                     if (!snapshot.exists()) {
                         console.log("Tidak ada data realtime. Setting semua status ke OFFLINE/MATI.");
                         
@@ -507,14 +514,8 @@
                         updateLedStatus(elLedPanas, "MATI", 'panas');
                         updateLedStatus(elLedDingin, "MATI", 'dingin');
                         
-                        // Set Gauge ke 0 (Atau biarkan nilai terakhir untuk estetika jika diinginkan)
-                        // dataSuhu.setValue(0, 1, 0);
-                        // gaugeSuhu.draw(dataSuhu, optionsSuhu);
-                        // dataKelembapan.setValue(0, 1, 0);
-                        // gaugeKelembapan.draw(dataKelembapan, optionsKelembapan);
-                        
                         latestRealtimeData = null; // Reset cache
-                        return;
+                        return; // Selesai. Tidak perlu menjalankan logika timeout.
                     }
                     
                     const data = snapshot.val();
@@ -530,7 +531,7 @@
                         gaugeKelembapan.draw(dataKelembapan, optionsKelembapan);
                     }
                     
-                    // Panggil status checker (Ini akan memperbarui status saat data baru masuk atau timeout)
+                    // Panggil status checker (Ini akan memperbarui status saat data baru masuk)
                     checkDeviceStatus(); 
                     
                     // Update Status LED
