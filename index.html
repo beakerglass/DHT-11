@@ -494,8 +494,26 @@
             const realtimeRef = ref(db, dbPath + '/realtime');
             onValue(realtimeRef, (snapshot) => {
                 try {
+                    // PERBAIKAN LOGIKA: Jika snapshot tidak ada, set semua ke OFF
                     if (!snapshot.exists()) {
-                        console.log("Tidak ada data realtime.");
+                        console.log("Tidak ada data realtime. Setting semua status ke OFFLINE/MATI.");
+                        
+                        // Set status OFFLINE
+                        elStatusPerangkat.textContent = "OFFLINE";
+                        elStatusPerangkat.className = "status-value offline";
+                        elLastSeen.textContent = "-";
+                        
+                        // Set LED MATI
+                        updateLedStatus(elLedPanas, "MATI", 'panas');
+                        updateLedStatus(elLedDingin, "MATI", 'dingin');
+                        
+                        // Set Gauge ke 0 (Atau biarkan nilai terakhir untuk estetika jika diinginkan)
+                        // dataSuhu.setValue(0, 1, 0);
+                        // gaugeSuhu.draw(dataSuhu, optionsSuhu);
+                        // dataKelembapan.setValue(0, 1, 0);
+                        // gaugeKelembapan.draw(dataKelembapan, optionsKelembapan);
+                        
+                        latestRealtimeData = null; // Reset cache
                         return;
                     }
                     
@@ -512,7 +530,7 @@
                         gaugeKelembapan.draw(dataKelembapan, optionsKelembapan);
                     }
                     
-                    // Panggil status checker (Ini akan memperbarui status saat data baru masuk)
+                    // Panggil status checker (Ini akan memperbarui status saat data baru masuk atau timeout)
                     checkDeviceStatus(); 
                     
                     // Update Status LED
