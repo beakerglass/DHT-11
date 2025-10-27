@@ -38,7 +38,7 @@
             height: 100%;
             z-index: -1;
             
-            /* --- PERBAIKAN AKHIR: MENGGUNAKAN NAMA FILE PALING AMAN (bg.png) --- */
+            /* --- PERBAIKAN AKHIR: MENGGUNAKAN NAMA FILE PALING AMAN (backgroundwebb.jpg) --- */
             background-image: 
                 /* 1. Layer Gelap (Overlay) */
                 linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), 
@@ -316,6 +316,7 @@
 
         // Path utama di database (sesuaikan dengan di ESP8266)
         const dbPath = "/proyek_mbkm";
+        let latestRealtimeData = null; // Cache untuk data realtime
 
         // Inisialisasi Firebase
         let app;
@@ -451,6 +452,38 @@
                 console.error("CRITICAL ERROR: Google Charts failed to initialize.", error);
             }
         }
+        
+        // --- Fungsi untuk memperbarui status berdasarkan cache data ---
+        function checkDeviceStatus() {
+            if (!latestRealtimeData) return;
+
+            const data = latestRealtimeData;
+
+            // --- LOGIKA STATUS PERANGKAT ---
+            if (data.last_seen) {
+                const timeDiff = Date.now() - data.last_seen;
+                const twoMinutes = 120000; // 2 menit dalam milidetik
+
+                if (timeDiff > twoMinutes) { 
+                    elStatusPerangkat.textContent = "OFFLINE";
+                    elStatusPerangkat.className = "status-value offline";
+                } else {
+                    elStatusPerangkat.textContent = "ONLINE";
+                    elStatusPerangkat.className = "status-value online";
+                }
+                
+                // Update Waktu Terakhir Dilihat
+                elLastSeen.textContent = formatWaktuLengkapWIB(data.last_seen, true); 
+            } else {
+                elStatusPerangkat.textContent = "OFFLINE";
+                elStatusPerangkat.className = "status-value offline";
+                elLastSeen.textContent = "-";
+            }
+        }
+        
+        // Atur interval agar checkDeviceStatus dipanggil setiap 5 detik
+        // Ini memastikan status OFFLINE muncul meskipun tidak ada data Firebase baru yang masuk
+        setInterval(checkDeviceStatus, 5000); 
 
         // --- Fungsi baru untuk menampung semua listener Firebase ---
         function startFirebaseListeners() {
@@ -467,7 +500,8 @@
                     }
                     
                     const data = snapshot.val();
-                    
+                    latestRealtimeData = data; // Update cache data
+
                     // Update Gauge
                     if (data.suhu !== undefined) {
                         dataSuhu.setValue(0, 1, parseFloat(data.suhu));
@@ -478,21 +512,8 @@
                         gaugeKelembapan.draw(dataKelembapan, optionsKelembapan);
                     }
                     
-
-                    // Update Status Perangkat
-                    if (data.last_seen) {
-                        // Menggunakan formatWaktu yang sudah diperbaiki untuk WIB
-                        elLastSeen.textContent = formatWaktu(data.last_seen);
-
-                        const timeDiff = Date.now() - data.last_seen;
-                        if (timeDiff > 120000) { // Lebih dari 2 menit
-                            elStatusPerangkat.textContent = "OFFLINE";
-                            elStatusPerangkat.className = "status-value offline";
-                        } else {
-                            elStatusPerangkat.textContent = "ONLINE";
-                            elStatusPerangkat.className = "status-value online";
-                        }
-                    }
+                    // Panggil status checker (Ini akan memperbarui status saat data baru masuk)
+                    checkDeviceStatus(); 
                     
                     // Update Status LED
                     updateLedStatus(elLedPanas, data.status_led_panas, 'panas');
@@ -560,7 +581,7 @@
                         // 2. Tambah data ke Tabel (SELALU jika Data VALID)
                         const newRow = elHistoryTableBody.insertRow(0);
                         newRow.innerHTML = `
-                            <td>${isTimeValid ? formatWaktuLengkap(timestamp) : 'Waktu Invalid (Hapus di Firebase)'}</td>
+                            <td>${isTimeValid ? formatWaktuLengkapWIB(timestamp, false) : 'Waktu Invalid (Hapus di Firebase)'}</td>
                             <td>${suhu.toFixed(1)}°C</td>
                             <td>${kelembapan.toFixed(1)}%</td>
                         `;
@@ -589,35 +610,39 @@
         // Fungsi Bantuan
         // ======================================================================
         
-        // Opsi format WIB (UTC+7)
-        const wibOptionsTime = {
-            hour: '2-digit', minute: '2-digit', second: '2-digit',
-            hour12: false, timeZone: 'Asia/Jakarta'
-        };
-
-        const wibOptionsDateTime = {
-            day: '2-digit', month: '2-digit', year: 'numeric',
-            hour: '2-digit', minute: '2-digit',
-            hour12: false, timeZone: 'Asia/Jakarta'
-        };
-
-        function formatWaktu(timestamp) {
-            if (!timestamp) return "-";
+        // Fungsi untuk format waktu di WIB (Asia/Jakarta)
+        function formatWaktuLengkapWIB(timestamp, isShort) {
             const d = new Date(timestamp);
-            // Menggunakan Intl.DateTimeFormat untuk format WIB (HH:MM:SS)
-            return new Intl.DateTimeFormat('id-ID', wibOptionsTime).format(d);
+            if (isNaN(d.getTime())) {
+                return "-"; 
+            }
+            
+            const options = {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: isShort ? '2-digit' : undefined, // Detik hanya untuk short/last_seen
+                hour12: false, // Format 24 jam
+                timeZone: 'Asia/Jakarta'
+            };
+
+            const formatter = new Intl.DateTimeFormat('id-ID', options);
+            const formatted = formatter.format(d);
+
+            // Perlu manipulasi string karena format Intl.DateTimeFormat sering menghasilkan "DD/MM/YYYY, HH.MM"
+            if (isShort) {
+                 // Format singkat (Status Terakhir Dilihat): 10:20:30
+                const parts = formatted.split(', ');
+                return parts[1]; // Ambil bagian waktu
+            } else {
+                 // Format panjang (Tabel Histori): 27/10/2025 10:20
+                 const parts = formatted.split(', ');
+                 return parts[0] + ' ' + parts[1].substring(0, 5); // DD/MM/YYYY HH:MM
+            }
         }
         
-        // PERBAIKAN: Fungsi untuk menangani tampilan 'NaN' dan format WIB lengkap
-        function formatWaktuLengkap(d) {
-             // Pastikan d adalah objek Date yang valid
-             if (isNaN(d.getTime())) {
-                 return "Waktu Invalid"; 
-             }
-             // Menggunakan Intl.DateTimeFormat untuk format WIB lengkap (DD/MM/YYYY HH:MM)
-             return new Intl.DateTimeFormat('id-ID', wibOptionsDateTime).format(d);
-        }
-
         function updateLedStatus(element, status, type) {
             if (!element) return;
             element.textContent = status;
@@ -636,3 +661,4 @@
 
 </body>
 </html>
+
