@@ -68,7 +68,7 @@
         /* Header */
         header {
             text-align: center;
-            padding: 25px;
+            padding: 25px 15px; /* Lebih ringkas di mobile */
             color: white;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
             /* --- PERUBAHAN: Menghilangkan background header --- */
@@ -76,21 +76,22 @@
         }
         header h1 {
             font-weight: 700;
-            font-size: 2.5rem;
+            font-size: 2rem; /* Ukuran lebih kecil di mobile */
         }
         header p {
             font-weight: 300;
-            font-size: 1.2rem;
+            font-size: 1rem; /* Ukuran lebih kecil di mobile */
         }
 
         /* Main Content Wrapper */
         .container {
             max-width: 1400px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 10px; /* Padding lebih kecil di mobile */
             display: grid;
-            gap: 20px;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 15px; /* Gap lebih kecil di mobile */
+            /* Default: Satu kolom penuh untuk mobile */
+            grid-template-columns: 1fr; 
         }
 
         /* Card Style (Kaca Buram / Glassmorphism) */
@@ -101,118 +102,134 @@
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.2);
-            padding: 20px;
+            padding: 15px; /* Padding lebih kecil di mobile */
             color: white;
             overflow: hidden; 
         }
 
         .card-title {
-            font-size: 1.4rem;
+            font-size: 1.2rem; /* Ukuran lebih kecil di mobile */
             font-weight: 600;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-            padding-bottom: 10px;
+            padding-bottom: 8px;
         }
+
+        /* Media Query untuk Tablet dan Desktop */
+        @media (min-width: 768px) {
+            header {
+                padding: 25px;
+            }
+            header h1 {
+                font-size: 2.5rem;
+            }
+            header p {
+                font-size: 1.2rem;
+            }
+            .container {
+                padding: 20px;
+                gap: 20px;
+                /* Tata letak asli untuk desktop */
+                grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); 
+            }
+            .card-title {
+                font-size: 1.4rem;
+                margin-bottom: 15px;
+                padding-bottom: 10px;
+            }
+            .card[style="grid-column: 1 / -1;"] {
+                grid-column: 1 / -1; /* Pertahankan lebar penuh untuk status di desktop */
+            }
+        }
+
 
         /* Style untuk Gauge */
         .gauge-container {
             display: flex;
             justify-content: space-around;
             align-items: center;
+            flex-direction: row; /* Default: row untuk desktop dan mobile */
+            gap: 10px;
         }
+        
+        /* Pastikan Gauge tidak terlalu besar di HP */
         #gauge_suhu, #gauge_kelembapan {
-            width: 100%;
-            max-width: 200px; 
+            width: 50%; /* Memastikan keduanya berbagi lebar di mobile */
+            max-width: 180px; 
+        }
+        
+        /* Style untuk Status Perangkat */
+        .status-grid {
+            display: grid;
+            /* Di mobile, buat 2 kolom agar tidak terlalu sempit */
+            grid-template-columns: 1fr 1fr; 
+            gap: 10px; 
+            text-align: center;
+        }
+        .status-item {
+            padding: 10px; /* Padding lebih kecil */
+            border-radius: 8px;
+        }
+        .status-item h4 {
+            font-size: 0.8rem;
+        }
+        .status-value {
+            font-size: 1.2rem;
+        }
+        
+        /* Status Grid di Desktop (768px+) */
+        @media (min-width: 768px) {
+            .status-grid {
+                gap: 15px;
+            }
+            .status-item {
+                padding: 15px;
+            }
+            .status-item h4 {
+                font-size: 1rem;
+            }
+            .status-value {
+                font-size: 1.5rem;
+            }
         }
         
         /* Style untuk Chart */
         .chart-container {
             width: 100%;
-            height: 350px;
+            height: 250px; /* Tinggi lebih pendek di mobile */
         }
-
-        /* Style untuk Status Perangkat */
-        .status-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            text-align: center;
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px; /* Tinggi normal di desktop */
+            }
         }
-        .status-item {
-            background: rgba(0, 0, 0, 0.2);
-            padding: 15px;
-            border-radius: 10px;
-        }
-        .status-item h4 {
-            font-size: 1rem;
-            font-weight: 400;
-            margin-bottom: 8px;
-            color: rgba(255, 255, 255, 0.8);
-        }
-        .status-value {
-            font-size: 1.5rem;
-            font-weight: 700;
-        }
-
-        /* Indikator Status Online/Offline */
-        #status_perangkat.online { color: #4CAF50; }
-        #status_perangkat.offline { color: #F44336; }
 
         /* Indikator LED */
         .led-indicator {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            margin-left: 10px;
-            vertical-align: middle;
-            background-color: #555; 
-            border: 2px solid white;
-            transition: background-color 0.3s ease;
+            width: 15px;
+            height: 15px;
         }
-        .led-indicator.menyala {
-            background-color: #FFEB3B; 
-            box-shadow: 0 0 15px #FFEB3B;
-        }
-        #status_led_panas.menyala { background-color: #F44336; box-shadow: 0 0 15px #F44336; }
-        #status_led_dingin.menyala { background-color: #2196F3; box-shadow: 0 0 15px #2196F3; }
 
         /* Style untuk Tabel Histori */
         .history-table-container {
-            max-height: 400px;
-            overflow-y: auto;
+            max-height: 300px; /* Lebih pendek di mobile */
         }
         table {
-            width: 100%;
-            border-collapse: collapse;
-            text-align: left;
+            font-size: 0.9rem;
         }
         th, td {
-            padding: 12px 15px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 8px 10px;
         }
-        th {
-            background: rgba(0, 0, 0, 0.2);
-            font-weight: 600;
-        }
-        tbody tr:hover {
-            background: rgba(255, 255, 255, 0.1);
-        }
-        
-        /* Scrollbar Estetis (WebKit) */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: rgba(0, 0, 0, 0.1);
-            border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.4);
-            border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.6);
+        @media (min-width: 768px) {
+            .history-table-container {
+                max-height: 400px;
+            }
+            table {
+                font-size: 1rem;
+            }
+            th, td {
+                padding: 12px 15px;
+            }
         }
 
     </style>
@@ -472,7 +489,7 @@
                 elStatusPerangkat.textContent = "OFFLINE";
                 elStatusPerangkat.className = "status-value offline";
                 
-                // --- PERUBAHAN: Matikan semua indikator saat OFFLINE ---
+                // --- Matikan semua indikator saat OFFLINE ---
                 // Matikan LED
                 updateLedStatus(elLedPanas, "MATI", 'panas');
                 updateLedStatus(elLedDingin, "MATI", 'dingin');
