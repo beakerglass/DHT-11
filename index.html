@@ -479,28 +479,20 @@
                     elStatusPerangkat.className = "status-value offline";
                 } 
                 // KONDISI KHUSUS: Jam ESP JAUH di depan (TimeDiff Negatif)
-                // Jika timeDiff NEGATIF (misal -24jt) dan nilai ini tidak berubah (yaitu, data.last_seen berhenti)
-                // maka waktu PC akan *mengejar* waktu ESP. timeDiff akan bergerak dari -24jt ke -24jt + 120rb
                 else if (timeDiff < -twoMinutes) { 
                      // Jika timeDiff sangat negatif, kita perlu memantau pergerakannya
                     if (lastKnownTimeDiff !== 0) {
-                        // Cek apakah timeDiff bergerak minimal 2 interval (10 detik) ke arah positif
-                        // Perbedaan antara timeDiff sekarang dan timeDiff terakhir harus > 2 * interval
                         const changeInDiff = timeDiff - lastKnownTimeDiff; 
                         
-                        // Perangkat ON -> timeDiff akan tetap mendekati nilai stabil negatif (karena data.last_seen terus diupdate)
-                        // Perangkat OFF -> timeDiff akan bergerak ke arah 0 (menjadi kurang negatif) dengan kecepatan Date.now()
-                        
-                        // Jika pergerakan timeDiff kurang dari 10 detik dalam 5 detik
+                        // Jika pergerakan timeDiff terlalu kecil (berarti ESP tidak update Firebase)
                         if (changeInDiff < (interval / 2)) {
-                            // Ini berarti data.last_seen BARU SAJA diperbarui (atau ESP masih mengirim data)
-                            elStatusPerangkat.textContent = "ONLINE";
-                            elStatusPerangkat.className = "status-value online";
-                        } else {
-                            // Ini berarti data.last_seen sudah lama tidak diperbarui, karena timeDiff sudah bergerak
-                            // Kita asumsikan pergerakan sekecil apapun berarti ESP sudah mati dan PC sedang mengejar.
+                            // Ini berarti data.last_seen sudah lama tidak diperbarui, PC sedang mengejar.
                             elStatusPerangkat.textContent = "OFFLINE";
                             elStatusPerangkat.className = "status-value offline";
+                        } else {
+                            // Data.last_seen BARU SAJA diperbarui (ESP masih online)
+                            elStatusPerangkat.textContent = "ONLINE"; // <-- DIHAPUS: "(Jam Cepat)"
+                            elStatusPerangkat.className = "status-value online";
                         }
                     }
                     
@@ -509,7 +501,8 @@
                     // Kita asumsikan perangkat ONLINE di tengah perbedaan waktu yang besar,
                     // sampai logikanya menentukan OFFLINE.
                     if (elStatusPerangkat.textContent !== "OFFLINE") {
-                        elStatusPerangkat.textContent = "ONLINE (Jam Cepat)";
+                        // PERUBAHAN: Menghilangkan teks "Jam Cepat"
+                        elStatusPerangkat.textContent = "ONLINE"; 
                         elStatusPerangkat.className = "status-value online";
                     }
                     
