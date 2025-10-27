@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Monitoring Suhu - Kelompok 11</title>
+    
+    <!-- Google Fonts untuk estetika -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Library Google Charts -->
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    
+    <style>
+        /* CSS Reset */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body, html {
+            font-family: 'Poppins', sans-serif;
+            height: 100%;
+            /* --- PERUBAHAN: Menghapus background-color agar transparan --- */
+            background-color: transparent; 
+            overflow-y: auto; 
+        }
+
+        /* Container Latar Belakang (Foto Anda) */
+        .background-container {
+            position: fixed; 
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            
+            /* --- PERBAIKAN AKHIR: MENGGUNAKAN NAMA FILE PALING AMAN (bg.png) --- */
+            background-image: 
+                /* 1. Layer Gelap (Overlay) */
+                linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), 
+                /* 2. Layer Titik-titik */
+                radial-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 1px), 
+                radial-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 1px),
+                /* 3. Base Image  */
+                url('backgroundwebb.jpg'); 
+            
+            /* Pengaturan Ukuran dan Posisi untuk setiap layer di atas */
+            background-size: 
+                cover, 
+                20px 20px, 
+                20px 20px, 
+                cover; 
+            
+            background-position: 
+                center, 
+                0 0, 
+                10px 10px, 
+                center; 
+            
+            filter: blur(5px);
+            transform: scale(1.05); 
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            padding: 25px;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            /* --- PERUBAHAN: Menghilangkan background header --- */
+            background-color: transparent; 
+        }
+        header h1 {
+            font-weight: 700;
+            font-size: 2.5rem;
+        }
+        header p {
+            font-weight: 300;
+            font-size: 1.2rem;
+        }
+
+        /* Main Content Wrapper */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            display: grid;
+            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        }
+
+        /* Card Style (Kaca Buram / Glassmorphism) */
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 20px;
+            color: white;
+            overflow: hidden; 
+        }
+
+        .card-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+            padding-bottom: 10px;
+        }
+
+        /* Style untuk Gauge */
+        .gauge-container {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+        }
+        #gauge_suhu, #gauge_kelembapan {
+            width: 100%;
+            max-width: 200px; 
+        }
+        
+        /* Style untuk Chart */
+        .chart-container {
+            width: 100%;
+            height: 350px;
+        }
+
+        /* Style untuk Status Perangkat */
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            text-align: center;
+        }
+        .status-item {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+        }
+        .status-item h4 {
+            font-size: 1rem;
+            font-weight: 400;
+            margin-bottom: 8px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        .status-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        /* Indikator Status Online/Offline */
+        #status_perangkat.online { color: #4CAF50; }
+        #status_perangkat.offline { color: #F44336; }
+
+        /* Indikator LED */
+        .led-indicator {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-left: 10px;
+            vertical-align: middle;
+            background-color: #555; 
+            border: 2px solid white;
+            transition: background-color 0.3s ease;
+        }
+        .led-indicator.menyala {
+            background-color: #FFEB3B; 
+            box-shadow: 0 0 15px #FFEB3B;
+        }
+        #status_led_panas.menyala { background-color: #F44336; box-shadow: 0 0 15px #F44336; }
+        #status_led_dingin.menyala { background-color: #2196F3; box-shadow: 0 0 15px #2196F3; }
+
+        /* Style untuk Tabel Histori */
+        .history-table-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+        th, td {
+            padding: 12px 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        th {
+            background: rgba(0, 0, 0, 0.2);
+            font-weight: 600;
+        }
+        tbody tr:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        /* Scrollbar Estetis (WebKit) */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.6);
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="background-container"></div>
+
+    <header>
+        <h1>Dashboard Monitoring DHT-11</h1>
+        <p>KELOMPOK 11 - Suhu & Kelembapan Real-time</p>
+    </header>
+
+    <main class="container">
+        
+        <!-- Kolom Status Perangkat -->
+        <div class="card" style="grid-column: 1 / -1;"> 
+            <h2 class="card-title">Status Perangkat</h2>
+            <div class="status-grid">
+                <div class="status-item">
+                    <h4>STATUS ESP8266</h4>
+                    <span id="status_perangkat" class="status-value offline">OFFLINE</span>
+                </div>
+                <div class="status-item">
+                    <h4>TERAKHIR DILIHAT</h4>
+                    <span id="status_last_seen" class="status-value">-</span>
+                </div>
+                <div class="status-item">
+                    <h4>LED SUHU PANAS</h4>
+                    <span id="status_led_panas" class="status-value">MATI</span>
+                </div>
+                <div class="status-item">
+                    <h4>LED SUHU DINGIN</h4>
+                    <span id="status_led_dingin" class="status-value">MATI</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Kolom Gauge -->
+        <div class="card">
+            <h2 class="card-title">Monitoring Real-time</h2>
+            <div class="gauge-container">
+                <div id="gauge_suhu"></div>
+                <div id="gauge_kelembapan"></div>
+            </div>
+        </div>
+
+        <!-- Kolom Grafik Suhu -->
+        <div class="card">
+            <h2 class="card-title">Grafik Suhu (°C)</h2>
+            <div id="chart_suhu" class="chart-container"></div>
+        </div>
+
+        <!-- Kolom Grafik Kelembapan -->
+        <div class="card">
+            <h2 class="card-title">Grafik Kelembapan (%)</h2>
+            <div id="chart_kelembapan" class="chart-container"></div>
+        </div>
+
+        <!-- Kolom Histori Data -->
+        <div class="card">
+            <h2 class="card-title">Histori Pembacaan Data</h2>
+            <div class="history-table-container">
+                <table id="history_table">
+                    <thead>
+                        <tr>
+                            <th>Waktu</th>
+                            <th>Suhu (°C)</th>
+                            <th>Kelembapan (%)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Data akan diisi oleh JavaScript -->
+                        <tr><td colspan="3" style="text-align:center;">Memuat data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Firebase SDK (Modular v9) -->
+    <script type="module">
+        // Import fungsi yang diperlukan dari SDK
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+        import { getDatabase, ref, onValue, query, orderByChild, limitToLast, set } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js";
+
+        // ======================================================================
+        // KONFIGURASI FIREBASE ANDA (Menggunakan nilai yang dikonfirmasi dari chat)
+        // ======================================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyAfz9Byn3XD8_k5y-65-WCeUaMKrabMvg", 
+            authDomain: "kelompok-11-76b37.firebaseapp.com",
+            databaseURL: "https://kelompok-11-76b37-default-rtdb.asia-southeast1.firebasedatabase.app", 
+            projectId: "kelompok-11-76b37",
+            storageBucket: "kelompok-11-76b37.appspot.com",
+            messagingSenderId: "954065961221",
+            appId: "1:954065961221:web:9b5836f776fbc4290f776c"
+        };
+        // ======================================================================
+
+        // Path utama di database (sesuaikan dengan di ESP8266)
+        const dbPath = "/proyek_mbkm";
+
+        // Inisialisasi Firebase
+        let app;
+        try {
+            app = initializeApp(firebaseConfig);
+        } catch (e) {
+            console.error("Firebase Initialization Error:", e);
+        }
+        const db = getDatabase(app);
+
+        // Referensi elemen DOM
+        const elStatusPerangkat = document.getElementById('status_perangkat');
+        const elLastSeen = document.getElementById('status_last_seen');
+        const elLedPanas = document.getElementById('status_led_panas');
+        const elLedDingin = document.getElementById('status_led_dingin');
+        const elHistoryTableBody = document.querySelector('#history_table tbody');
+
+        // Google Charts Setup
+        google.charts.load('current', {'packages':['gauge', 'corechart']});
+        
+        let gaugeSuhu, gaugeKelembapan;
+        let dataSuhu, dataKelembapan;
+        let optionsSuhu, optionsKelembapan;
+
+        let chartSuhu, chartKelembapan;
+        let dataChartSuhu, dataChartKelembapan;
+        let optionsChartSuhu, optionsChartKelembapan;
+        
+        // Opsi global untuk chart agar senada dengan tema
+        const chartOptions = {
+            backgroundColor: 'transparent',
+            legend: { textStyle: { color: '#FFF' } },
+            titleTextStyle: { color: '#FFF' },
+            hAxis: { 
+                textStyle: { color: '#EEE' },
+                gridlines: { color: 'transparent' }
+            },
+            vAxis: { 
+                textStyle: { color: '#EEE' },
+                gridlines: { color: 'rgba(255, 255, 255, 0.2)' },
+                baselineColor: 'rgba(255, 255, 255, 0.2)'
+            },
+            series: {
+                0: { color: '#F44336' }, // Suhu (Merah)
+                1: { color: '#2196F3' }  // Kelembapan (Biru)
+            },
+            chartArea: { left: 40, top: 20, width: '90%', height: '80%' }
+        };
+        
+        // Fungsi untuk menggambar ulang chart setelah resize (solusi umum untuk bug rendering chart)
+        function drawAllCharts() {
+            if (chartSuhu) chartSuhu.draw(dataChartSuhu, optionsChartSuhu);
+            if (chartKelembapan) chartKelembapan.draw(dataChartKelembapan, optionsChartKelembapan);
+            if (gaugeSuhu) gaugeSuhu.draw(dataSuhu, optionsSuhu);
+            if (gaugeKelembapan) gaugeKelembapan.draw(dataKelembapan, optionsKelembapan);
+        }
+        window.onresize = drawAllCharts; // Mengatasi masalah rendering chart saat resize/load
+
+        function drawInitialCharts() {
+            try {
+                // --- Inisialisasi Gauge Suhu ---
+                dataSuhu = google.visualization.arrayToDataTable([
+                    ['Label', 'Value'],
+                    ['Suhu', 0]
+                ]);
+                optionsSuhu = {
+                    width: 200, height: 200,
+                    redFrom: 30, redTo: 50,
+                    yellowFrom: 25, yellowTo: 30,
+                    minorTicks: 5, max: 50,
+                    animation: { duration: 400, easing: 'inAndOut' }
+                };
+                gaugeSuhu = new google.visualization.Gauge(document.getElementById('gauge_suhu'));
+                gaugeSuhu.draw(dataSuhu, optionsSuhu);
+
+                // --- Inisialisasi Gauge Kelembapan ---
+                dataKelembapan = google.visualization.arrayToDataTable([
+                    ['Label', 'Value'],
+                    ['Lembap', 0]
+                ]);
+                optionsKelembapan = {
+                    width: 200, height: 200,
+                    redFrom: 90, redTo: 100,
+                    yellowFrom: 70, yellowTo: 90,
+                    minorTicks: 5, max: 100,
+                    animation: { duration: 400, easing: 'inAndOut' }
+                };
+                gaugeKelembapan = new google.visualization.Gauge(document.getElementById('gauge_kelembapan'));
+                gaugeKelembapan.draw(dataKelembapan, optionsKelembapan);
+
+                // --- Inisialisasi Chart Suhu ---
+                dataChartSuhu = new google.visualization.DataTable();
+                dataChartSuhu.addColumn('datetime', 'Waktu');
+                dataChartSuhu.addColumn('number', 'Suhu');
+                chartSuhu = new google.visualization.LineChart(document.getElementById('chart_suhu'));
+                
+                // --- OPSI BARU: Poly Line dan Explorer (Geser) ---
+                optionsChartSuhu = { 
+                    ...chartOptions, 
+                    title: 'Grafik Suhu (°C)', 
+                    curveType: 'none', // Membuat garis kaku/poly line
+                    explorer: { 
+                        actions: ['dragToZoom', 'rightClickToReset'], 
+                        axis: 'horizontal', 
+                        maxZoomIn: 0.01 
+                    }, 
+                    series: { 0: { color: '#F44336' } } 
+                };
+                chartSuhu.draw(dataChartSuhu, optionsChartSuhu);
+                
+                // --- Inisialisasi Chart Kelembapan ---
+                dataChartKelembapan = new google.visualization.DataTable();
+                dataChartKelembapan.addColumn('datetime', 'Waktu');
+                dataChartKelembapan.addColumn('number', 'Kelembapan');
+                chartKelembapan = new google.visualization.LineChart(document.getElementById('chart_kelembapan'));
+                
+                // --- OPSI BARU: Poly Line dan Explorer (Geser) ---
+                optionsChartKelembapan = { 
+                    ...chartOptions, 
+                    title: 'Grafik Kelembapan (%)', 
+                    curveType: 'none', // Membuat garis kaku/poly line
+                    explorer: { 
+                        actions: ['dragToZoom', 'rightClickToReset'], 
+                        axis: 'horizontal', 
+                        maxZoomIn: 0.01 
+                    }, 
+                    series: { 0: { color: '#2196F3' } } 
+                };
+                chartKelembapan.draw(dataChartKelembapan, optionsChartKelembapan);
+                
+                startFirebaseListeners(); // Mulai listener setelah charts siap
+            } catch (error) {
+                console.error("CRITICAL ERROR: Google Charts failed to initialize.", error);
+            }
+        }
+
+        // --- Fungsi baru untuk menampung semua listener Firebase ---
+        function startFirebaseListeners() {
+
+            // ======================================================================
+            // LISTENER 1: Data Real-time (Untuk Gauge dan Status)
+            // ======================================================================
+            const realtimeRef = ref(db, dbPath + '/realtime');
+            onValue(realtimeRef, (snapshot) => {
+                try {
+                    if (!snapshot.exists()) {
+                        console.log("Tidak ada data realtime.");
+                        return;
+                    }
+                    
+                    const data = snapshot.val();
+                    
+                    // Update Gauge
+                    if (data.suhu !== undefined) {
+                        dataSuhu.setValue(0, 1, parseFloat(data.suhu));
+                        gaugeSuhu.draw(dataSuhu, optionsSuhu);
+                    }
+                    if (data.kelembapan !== undefined) {
+                        dataKelembapan.setValue(0, 1, parseFloat(data.kelembapan));
+                        gaugeKelembapan.draw(dataKelembapan, optionsKelembapan);
+                    }
+                    
+
+                    // Update Status Perangkat
+                    if (data.last_seen) {
+                        // Menggunakan formatWaktu yang sudah diperbaiki untuk WIB
+                        elLastSeen.textContent = formatWaktu(data.last_seen);
+
+                        const timeDiff = Date.now() - data.last_seen;
+                        if (timeDiff > 120000) { // Lebih dari 2 menit
+                            elStatusPerangkat.textContent = "OFFLINE";
+                            elStatusPerangkat.className = "status-value offline";
+                        } else {
+                            elStatusPerangkat.textContent = "ONLINE";
+                            elStatusPerangkat.className = "status-value online";
+                        }
+                    }
+                    
+                    // Update Status LED
+                    updateLedStatus(elLedPanas, data.status_led_panas, 'panas');
+                    updateLedStatus(elLedDingin, data.status_led_dingin, 'dingin');
+                } catch (error) {
+                     console.error("ERROR in Realtime Listener:", error);
+                }
+
+            });
+
+            // ======================================================================
+            // LISTENER 2: Data Histori (Untuk Chart dan Tabel)
+            // ======================================================================
+            const historyRef = query(ref(db, dbPath + '/history'), orderByChild('timestamp'), limitToLast(50));
+            
+            onValue(historyRef, (snapshot) => {
+                try {
+                    if (!snapshot.exists()) {
+                        elHistoryTableBody.innerHTML = '<tr><td colspan="3" style="text-align:center;">Belum ada data histori.</td></tr>';
+                        console.log("Tidak ada data histori yang ditemukan.");
+                        return;
+                    }
+                    
+                    const data = snapshot.val();
+                    
+                    // Bersihkan data lama
+                    elHistoryTableBody.innerHTML = "";
+                    dataChartSuhu.removeRows(0, dataChartSuhu.getNumberOfRows());
+                    dataChartKelembapan.removeRows(0, dataChartKelembapan.getNumberOfRows());
+
+                    let historyCount = 0;
+                    // Loop data dari Firebase
+                    Object.keys(data).forEach(key => {
+                        const record = data[key];
+                        
+                        // Pengecekan data yang kuat dan memastikan timestamp ada
+                        const timestampValue = record.timestamp;
+                        
+                        // Parse values, setting defaults if invalid/missing
+                        const suhu = parseFloat(record.suhu);
+                        const kelembapan = parseFloat(record.kelembapan);
+                        const timestamp = new Date(timestampValue);
+
+                        // Check 1: Is the record valid for display? (at least has valid temp/hum)
+                        const isTimeValid = !isNaN(timestamp.getTime());
+                        const isDataValid = !isNaN(suhu) && !isNaN(kelembapan);
+
+                        // If no valid data, skip the entire record
+                        if (!isDataValid) {
+                            console.warn("Skipping record: Suhu/Kelembapan invalid or missing.", record);
+                            return; 
+                        }
+                        
+                        // Count valid records for the chart *only* if time is also valid
+                        if (isTimeValid) {
+                            historyCount++;
+                            
+                            // 1. Tambah data ke Chart (HANYA jika Waktu VALID)
+                            dataChartSuhu.addRow([timestamp, suhu]);
+                            dataChartKelembapan.addRow([timestamp, kelembapan]);
+                        } else {
+                            console.warn("Skipping chart entry: Time invalid.", record);
+                        }
+
+                        // 2. Tambah data ke Tabel (SELALU jika Data VALID)
+                        const newRow = elHistoryTableBody.insertRow(0);
+                        newRow.innerHTML = `
+                            <td>${isTimeValid ? formatWaktuLengkap(timestamp) : 'Waktu Invalid (Hapus di Firebase)'}</td>
+                            <td>${suhu.toFixed(1)}°C</td>
+                            <td>${kelembapan.toFixed(1)}%</td>
+                        `;
+                    });
+                    
+                    if (historyCount > 0) {
+                        // Gambar ulang chart HANYA jika ada data valid
+                        chartSuhu.draw(dataChartSuhu, optionsChartSuhu);
+                        chartKelembapan.draw(dataChartKelembapan, optionsChartKelembapan);
+                    } else {
+                         // Pesan ini hanya muncul jika data berhasil dibaca, tetapi semuanya gagal validasi internal
+                        elHistoryTableBody.innerHTML = '<tr><td colspan="3" style="text-align:center;">Semua data yang diterima tidak valid untuk digambar.</td></tr>';
+                    }
+                } catch (error) {
+                    console.error("CRITICAL ERROR in History Listener:", error);
+                    elHistoryTableBody.innerHTML = '<tr><td colspan="3" style="text-align:center;">ERROR: Kesalahan kritis saat memproses data.</td></tr>';
+                }
+            });
+        }
+        
+        // Panggil drawInitialCharts saat Google Charts API selesai dimuat
+        google.charts.setOnLoadCallback(drawInitialCharts);
+
+
+        // ======================================================================
+        // Fungsi Bantuan
+        // ======================================================================
+        
+        // Opsi format WIB (UTC+7)
+        const wibOptionsTime = {
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false, timeZone: 'Asia/Jakarta'
+        };
+
+        const wibOptionsDateTime = {
+            day: '2-digit', month: '2-digit', year: 'numeric',
+            hour: '2-digit', minute: '2-digit',
+            hour12: false, timeZone: 'Asia/Jakarta'
+        };
+
+        function formatWaktu(timestamp) {
+            if (!timestamp) return "-";
+            const d = new Date(timestamp);
+            // Menggunakan Intl.DateTimeFormat untuk format WIB (HH:MM:SS)
+            return new Intl.DateTimeFormat('id-ID', wibOptionsTime).format(d);
+        }
+        
+        // PERBAIKAN: Fungsi untuk menangani tampilan 'NaN' dan format WIB lengkap
+        function formatWaktuLengkap(d) {
+             // Pastikan d adalah objek Date yang valid
+             if (isNaN(d.getTime())) {
+                 return "Waktu Invalid"; 
+             }
+             // Menggunakan Intl.DateTimeFormat untuk format WIB lengkap (DD/MM/YYYY HH:MM)
+             return new Intl.DateTimeFormat('id-ID', wibOptionsDateTime).format(d);
+        }
+
+        function updateLedStatus(element, status, type) {
+            if (!element) return;
+            element.textContent = status;
+            element.classList.remove('menyala'); 
+            element.classList.remove('panas'); 
+            element.classList.remove('dingin'); 
+
+            if (status === "MENYALA") {
+                element.classList.add('menyala');
+                if(type === 'panas') element.classList.add('panas');
+                if(type === 'dingin') element.classList.add('dingin');
+            }
+        }
+
+    </script>
+
+</body>
+</html>
