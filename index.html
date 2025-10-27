@@ -459,7 +459,7 @@
         function checkDeviceStatus() {
             // Logika Sederhana: Hanya bisa ONLINE jika Firebase update kurang dari batas waktu
             const timeSinceLastFirebaseUpdate = Date.now() - lastFirebaseUpdateTimestamp;
-            // PERUBAHAN KRITIS: Mengurangi waktu tunggu dari 120 detik menjadi 30 detik
+            // Waktu tunggu sekarang 30 detik
             const maxWaitTime = 30000; // 30 detik dalam milidetik
 
             // DEBUG LOG
@@ -471,6 +471,18 @@
             if (timeSinceLastFirebaseUpdate > maxWaitTime) {
                 elStatusPerangkat.textContent = "OFFLINE";
                 elStatusPerangkat.className = "status-value offline";
+                
+                // --- PERUBAHAN: Matikan semua indikator saat OFFLINE ---
+                // Matikan LED
+                updateLedStatus(elLedPanas, "MATI", 'panas');
+                updateLedStatus(elLedDingin, "MATI", 'dingin');
+                
+                // Reset Gauge ke nol
+                dataSuhu.setValue(0, 1, 0);
+                gaugeSuhu.draw(dataSuhu, optionsSuhu);
+                dataKelembapan.setValue(0, 1, 0);
+                gaugeKelembapan.draw(dataKelembapan, optionsKelembapan);
+                
             } else {
                 // Jika masih dalam batas waktu sejak data terakhir diterima
                 elStatusPerangkat.textContent = "ONLINE";
@@ -506,40 +518,62 @@
                         // Tetap OFFLINE (biarkan checkDeviceStatus yang menangani)
                         latestRealtimeData = null; // Reset cache
                         lastFirebaseUpdateTimestamp = 0; // Reset timer
+                        
+                        // Hapus status ONLINE yang mungkin muncul saat refresh
+                        elStatusPerangkat.textContent = "OFFLINE";
+                        elStatusPerangkat.className = "status-value offline";
+                        
                         return; 
                     }
                     
                     const data = snapshot.val();
+                    // Gunakan JSON.stringify untuk membandingkan data lama dan data baru secara mendalam
                     const isNewData = JSON.stringify(data) !== JSON.stringify(latestRealtimeData);
                     
-                    latestRealtimeData = data; // Update cache data
+                    // Update cache data
+                    latestRealtimeData = data; 
                     
-                    // PENTING: Update timestamp HANYA JIKA ADA PERUBAHAN DATA (bukan hanya koneksi ulang Firebase)
+                    // PENTING: Update timestamp HANYA JIKA ADA PERUBAHAN DATA
                     if (isNewData) {
                        lastFirebaseUpdateTimestamp = Date.now();
                        console.log("Firebase Update DETECTED. Resetting timer.");
+                       
+                        // Update Gauge (karena data baru)
+                        if (data.suhu !== undefined) {
+                            dataSuhu.setValue(0, 1, parseFloat(data.suhu));
+                            gaugeSuhu.draw(dataSuhu, optionsSuhu);
+                        }
+                        if (data.kelembapan !== undefined) {
+                            dataKelembapan.setValue(0, 1, parseFloat(data.kelembapan));
+                            gaugeKelembapan.draw(dataKelembapan, optionsKelembapan);
+                        }
+                        
+                        // Update Status LED
+                        updateLedStatus(elLedPanas, data.status_led_panas, 'panas');
+                        updateLedStatus(elLedDingin, data.status_led_dingin, 'dingin');
+
                     } else if (lastFirebaseUpdateTimestamp === 0) {
                         // Jika ini adalah koneksi awal dan data ada, set timestamp pertama kali
                         lastFirebaseUpdateTimestamp = Date.now();
                         console.log("Initial Firebase connection established.");
-                    }
-                    
-                    // Update Gauge
-                    if (data.suhu !== undefined) {
-                        dataSuhu.setValue(0, 1, parseFloat(data.suhu));
-                        gaugeSuhu.draw(dataSuhu, optionsSuhu);
-                    }
-                    if (data.kelembapan !== undefined) {
-                        dataKelembapan.setValue(0, 1, parseFloat(data.kelembapan));
-                        gaugeKelembapan.draw(dataKelembapan, optionsKelembapan);
+
+                         // Update Gauge dan LED (saat koneksi awal)
+                        if (data.suhu !== undefined) {
+                            dataSuhu.setValue(0, 1, parseFloat(data.suhu));
+                            gaugeSuhu.draw(dataSuhu, optionsSuhu);
+                        }
+                        if (data.kelembapan !== undefined) {
+                            dataKelembapan.setValue(0, 1, parseFloat(data.kelembapan));
+                            gaugeKelembapan.draw(dataKelembapan, optionsKelembapan);
+                        }
+                        updateLedStatus(elLedPanas, data.status_led_panas, 'panas');
+                        updateLedStatus(elLedDingin, data.status_led_dingin, 'dingin');
+
                     }
                     
                     // Panggil status checker (Ini akan memperbarui status saat data baru masuk)
                     checkDeviceStatus(); 
                     
-                    // Update Status LED
-                    updateLedStatus(elLedPanas, data.status_led_panas, 'panas');
-                    updateLedStatus(elLedDingin, data.status_led_dingin, 'dingin');
                 } catch (error) {
                      console.error("ERROR in Realtime Listener:", error);
                 }
