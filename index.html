@@ -317,7 +317,8 @@
         // Path utama di database (sesuaikan dengan di ESP8266)
         const dbPath = "/proyek_mbkm";
         let latestRealtimeData = null; // Cache untuk data realtime
-        let lastKnownTimeDiff = 0;     // Menyimpan timeDiff terakhir yang dihitung
+        // Variabel untuk menyimpan timestamp terakhir saat *firebase listener* terakhir aktif
+        let lastFirebaseUpdateTimestamp = 0; 
 
         // Inisialisasi Firebase
         let app;
@@ -457,70 +458,43 @@
         // --- Fungsi untuk memperbarui status berdasarkan cache data ---
         function checkDeviceStatus() {
             if (!latestRealtimeData) {
-                // Jika cache kosong, status sudah diatur di listener.
                 return;
             }
+            
+            // LOGIKA BARU UNTUK MENGATASI CLOCK DRIFT
+            const timeSinceLastFirebaseUpdate = Date.now() - lastFirebaseUpdateTimestamp;
+            const twoMinutes = 120000; // 2 menit dalam milidetik
 
             const data = latestRealtimeData;
+            const timeDiff = Date.now() - data.last_seen;
 
-            // --- LOGIKA STATUS PERANGKAT ---
-            if (data.last_seen) {
-                const timeDiff = Date.now() - data.last_seen;
-                const twoMinutes = 120000; // 2 menit dalam milidetik
-                const interval = 5000; // 5 detik (interval cek)
-
-                // Debug log yang lebih jelas:
-                console.log(`[STATUS CHECK] PC Time: ${Date.now()}, ESP Time: ${data.last_seen}. Diff: ${timeDiff} ms`);
-                
-                // KONDISI UTAMA: Logika Timeout
-                if (timeDiff > twoMinutes) { 
-                    // Case 1: Time Diff Positif dan melewati batas (Jam PC di depan)
-                    elStatusPerangkat.textContent = "OFFLINE";
-                    elStatusPerangkat.className = "status-value offline";
-                } 
-                // KONDISI KHUSUS: Jam ESP JAUH di depan (TimeDiff Negatif)
-                else if (timeDiff < -twoMinutes) { 
-                     // Jika timeDiff sangat negatif, kita perlu memantau pergerakannya
-                    if (lastKnownTimeDiff !== 0) {
-                        const changeInDiff = timeDiff - lastKnownTimeDiff; 
-                        
-                        // Jika pergerakan timeDiff terlalu kecil (berarti ESP tidak update Firebase)
-                        if (changeInDiff < (interval / 2)) {
-                            // Ini berarti data.last_seen sudah lama tidak diperbarui, PC sedang mengejar.
-                            elStatusPerangkat.textContent = "OFFLINE";
-                            elStatusPerangkat.className = "status-value offline";
-                        } else {
-                            // Data.last_seen BARU SAJA diperbarui (ESP masih online)
-                            elStatusPerangkat.textContent = "ONLINE"; // <-- DIHAPUS: "(Jam Cepat)"
-                            elStatusPerangkat.className = "status-value online";
-                        }
-                    }
-                    
-                    lastKnownTimeDiff = timeDiff; // Update timeDiff terakhir
-                    
-                    // Kita asumsikan perangkat ONLINE di tengah perbedaan waktu yang besar,
-                    // sampai logikanya menentukan OFFLINE.
-                    if (elStatusPerangkat.textContent !== "OFFLINE") {
-                        // PERUBAHAN: Menghilangkan teks "Jam Cepat"
-                        elStatusPerangkat.textContent = "ONLINE"; 
-                        elStatusPerangkat.className = "status-value online";
-                    }
-                    
-                }
-                // Jika timeDiff berada di antara -2 menit dan +2 menit
-                else {
-                    elStatusPerangkat.textContent = "ONLINE";
-                    elStatusPerangkat.className = "status-value online";
-                }
-                
-                // Update Waktu Terakhir Dilihat
-                elLastSeen.textContent = formatWaktuLengkapWIB(data.last_seen, true); 
-            } else {
-                // Jika last_seen ada, tetapi nilainya invalid (null/undefined)
+            // Debug log yang lebih jelas:
+            console.log(`[STATUS CHECK] TimeSinceUpdate: ${timeSinceLastFirebaseUpdate} ms. Diff (PC-ESP): ${timeDiff} ms`);
+            
+            
+            // KONDISI UTAMA: LOGIKA TIMEOUT
+            // Kita gunakan variabel 'lastFirebaseUpdateTimestamp' yang di-reset HANYA saat data baru masuk.
+            if (timeSinceLastFirebaseUpdate > twoMinutes) {
+                // Jika sudah lebih dari 2 menit sejak Firebase Listener terakhir diaktifkan (ESP mengirim data)
                 elStatusPerangkat.textContent = "OFFLINE";
                 elStatusPerangkat.className = "status-value offline";
+                
+                // Karena kita tahu ESP mati, kita update juga last_seen agar tidak menampilkan waktu yang maju.
+                // NOTE: Kita tidak bisa update elemen ini secara real-time tanpa data baru, jadi biarkan saja.
+                
+            } else {
+                // Jika masih dalam batas 2 menit sejak data terakhir diterima
+                elStatusPerangkat.textContent = "ONLINE";
+                elStatusPerangkat.className = "status-value online";
+            }
+            
+            // Update Waktu Terakhir Dilihat (menggunakan data yang terakhir diterima)
+            if (data.last_seen) {
+                elLastSeen.textContent = formatWaktuLengkapWIB(data.last_seen, true);
+            } else {
                 elLastSeen.textContent = "-";
             }
+
         }
         
         // Atur interval agar checkDeviceStatus dipanggil setiap 5 detik
@@ -550,15 +524,15 @@
                         updateLedStatus(elLedDingin, "MATI", 'dingin');
                         
                         latestRealtimeData = null; // Reset cache
+                        lastFirebaseUpdateTimestamp = 0; // Reset timer
                         return; // Selesai. Tidak perlu menjalankan logika timeout.
                     }
                     
                     const data = snapshot.val();
                     latestRealtimeData = data; // Update cache data
                     
-                    // PENTING: Reset lastKnownTimeDiff saat data baru datang dari ESP (berarti ESP ONLINE)
-                    const timeDiffOnUpdate = Date.now() - data.last_seen;
-                    lastKnownTimeDiff = timeDiffOnUpdate; 
+                    // PENTING: Update timestamp hanya jika data baru datang dari Firebase (ESP ONLINE)
+                    lastFirebaseUpdateTimestamp = Date.now();
                     
                     // Update Gauge
                     if (data.suhu !== undefined) {
