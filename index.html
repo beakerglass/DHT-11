@@ -317,6 +317,7 @@
         // Path utama di database (sesuaikan dengan di ESP8266)
         const dbPath = "/proyek_mbkm";
         let latestRealtimeData = null; // Cache untuk data realtime
+        let lastKnownTimeDiff = 0;     // Menyimpan timeDiff terakhir yang dihitung
 
         // Inisialisasi Firebase
         let app;
@@ -456,7 +457,7 @@
         // --- Fungsi untuk memperbarui status berdasarkan cache data ---
         function checkDeviceStatus() {
             if (!latestRealtimeData) {
-                // Jika cache kosong (snapshot.exists() == false), status sudah diatur di listener.
+                // Jika cache kosong, status sudah diatur di listener.
                 return;
             }
 
@@ -466,122 +467,58 @@
             if (data.last_seen) {
                 const timeDiff = Date.now() - data.last_seen;
                 const twoMinutes = 120000; // 2 menit dalam milidetik
+                const interval = 5000; // 5 detik (interval cek)
 
-                // DEBUG LOG: Kritis untuk melihat apakah timeDiff bertambah
-                console.log(`[STATUS CHECK] Time difference (ms): ${timeDiff}. Threshold: ${twoMinutes}`);
+                // Debug log yang lebih jelas:
+                console.log(`[STATUS CHECK] PC Time: ${Date.now()}, ESP Time: ${data.last_seen}. Diff: ${timeDiff} ms`);
                 
-                // KONDISI UTAMA: Jika timeDiff positif DAN melebihi 2 menit
+                // KONDISI UTAMA: Logika Timeout
                 if (timeDiff > twoMinutes) { 
+                    // Case 1: Time Diff Positif dan melewati batas (Jam PC di depan)
                     elStatusPerangkat.textContent = "OFFLINE";
                     elStatusPerangkat.className = "status-value offline";
                 } 
-                // KONDISI BARU: Jika timeDiff sangat negatif (Waktu ESP jauh di depan)
-                // Kita tahu dari log bahwa timeDiff sangat negatif (sekitar -24 juta), jadi jika ESP ON,
-                // timeDiff akan stabil negatif. Jika ESP OFF, timeDiff akan tetap negatif.
-                // KITA HARUS MENGUBAH LOGIKA INI!
-                
-                // LOGIKA BARU: Perangkat dianggap ONLINE HANYA jika timeDiff positif (jam ESP di belakang)
-                // DAN timeDiff kurang dari 2 menit. Atau jika timeDiff sangat negatif (jam ESP maju).
-                
-                // Mengganti semua kondisi if/else menjadi satu cek sederhana:
-                
-                let statusIsOnline = false;
-                
-                // Case 1: Waktu ESP berada dalam rentang toleransi ONLINE normal (timeDiff positif)
-                if (timeDiff >= 0 && timeDiff <= twoMinutes) {
-                    statusIsOnline = true;
-                } 
-                // Case 2: Waktu ESP jauh di depan (timeDiff negatif). 
-                // Kita anggap ONLINE jika perbedaannya stabil (tidak bergerak) dan tidak terlalu ekstrem
-                // Namun, karena log Anda menunjukkan ESP Anda memiliki *forward clock drift* yang konstan,
-                // kita harus mengandalkan Case 1 dan membuat Case 2 sebagai indikator error waktu.
-
-                // Jika timeDiff NEGATIF (Jam ESP maju), kita hanya mengizinkan status ONLINE jika
-                // timeDiff tidak terlalu jauh negatif (misal, tidak lebih dari 5 menit maju)
-                else if (timeDiff < 0 && timeDiff > -300000) { // Rentang toleransi -5 menit
-                    statusIsOnline = true; 
-                    // Kita harus berasumsi bahwa jika perangkat offline, timeDiff akan stabil
-                    // (tetap di sekitar -24juta), tapi jika ESP hidup, timeDiff seharusnya "reset"
-                    // (tetap -24juta). Karena timeDiff tidak bergerak positif, kita harus tetap OFFLINE
-                    // jika timeDiff terlalu jauh negatif.
+                // KONDISI KHUSUS: Jam ESP JAUH di depan (TimeDiff Negatif)
+                // Jika timeDiff NEGATIF (misal -24jt) dan nilai ini tidak berubah (yaitu, data.last_seen berhenti)
+                // maka waktu PC akan *mengejar* waktu ESP. timeDiff akan bergerak dari -24jt ke -24jt + 120rb
+                else if (timeDiff < -twoMinutes) { 
+                     // Jika timeDiff sangat negatif, kita perlu memantau pergerakannya
+                    if (lastKnownTimeDiff !== 0) {
+                        // Cek apakah timeDiff bergerak minimal 2 interval (10 detik) ke arah positif
+                        // Perbedaan antara timeDiff sekarang dan timeDiff terakhir harus > 2 * interval
+                        const changeInDiff = timeDiff - lastKnownTimeDiff; 
+                        
+                        // Perangkat ON -> timeDiff akan tetap mendekati nilai stabil negatif (karena data.last_seen terus diupdate)
+                        // Perangkat OFF -> timeDiff akan bergerak ke arah 0 (menjadi kurang negatif) dengan kecepatan Date.now()
+                        
+                        // Jika pergerakan timeDiff kurang dari 10 detik dalam 5 detik
+                        if (changeInDiff < (interval / 2)) {
+                            // Ini berarti data.last_seen BARU SAJA diperbarui (atau ESP masih mengirim data)
+                            elStatusPerangkat.textContent = "ONLINE";
+                            elStatusPerangkat.className = "status-value online";
+                        } else {
+                            // Ini berarti data.last_seen sudah lama tidak diperbarui, karena timeDiff sudah bergerak
+                            // Kita asumsikan pergerakan sekecil apapun berarti ESP sudah mati dan PC sedang mengejar.
+                            elStatusPerangkat.textContent = "OFFLINE";
+                            elStatusPerangkat.className = "status-value offline";
+                        }
+                    }
+                    
+                    lastKnownTimeDiff = timeDiff; // Update timeDiff terakhir
+                    
+                    // Kita asumsikan perangkat ONLINE di tengah perbedaan waktu yang besar,
+                    // sampai logikanya menentukan OFFLINE.
+                    if (elStatusPerangkat.textContent !== "OFFLINE") {
+                        elStatusPerangkat.textContent = "ONLINE (Jam Cepat)";
+                        elStatusPerangkat.className = "status-value online";
+                    }
+                    
                 }
-
-                // KITA KEMBALI KE LOGIKA DASAR + PENANGANAN JAM MAJU:
-                if (timeDiff > twoMinutes) { 
-                    elStatusPerangkat.textContent = "OFFLINE";
-                    elStatusPerangkat.className = "status-value offline";
-                } 
-                // JIKA JAM ESP MAJU SANGAT JAUH, ANGGAP OFFLINE
-                else if (timeDiff < -300000) { 
-                    elStatusPerangkat.textContent = "OFFLINE (Waktu ESP Terlalu Cepat)";
-                    elStatusPerangkat.className = "status-value offline";
-                }
-                // Jika timeDiff berada di antara -300000 dan 120000 (termasuk nilai negatif -24jt Anda yang stabil)
+                // Jika timeDiff berada di antara -2 menit dan +2 menit
                 else {
                     elStatusPerangkat.textContent = "ONLINE";
                     elStatusPerangkat.className = "status-value online";
                 }
-                
-                
-                
-                // KESIMPULAN: LOGIKA DI ATAS ADALAH LOGIKA YANG ADA SEBELUMNYA.
-                // MASALAHNYA ADALAH NILAI -24JUTA TIDAK BERGERAK.
-                
-                // JIKA ESP MATI, NILAI -24 JUTA ITU SEHARUSNYA BERGERAK POSITIF (MENJADI KURANG NEGATIF)
-                // KARENA Date.now() BERJALAN.
-                
-                // Time ESP: 10:00:00 (Firebase: 1698307200000)
-                // Time PC: 03:00:00 (Date.now(): 1698282000000)
-                // timeDiff = PC - ESP = -25200000 ms (Stabil)
-                
-                // 2 Menit Kemudian (ESP Mati)
-                // Time PC: 03:02:00 (Date.now(): 1698282120000)
-                // timeDiff = PC - ESP = 1698282120000 - 1698307200000 = -25079880 ms
-                
-                // Waktu NEGATIF ITU HARUSNYA BERKURANG NEGATIFNYA!
-                // Perbedaan: -25200000 -> -25079880 (Bergerak 120000 ms)
-                // Jadi, timeDiff TIDAK BERGERAK ke arah > 120000.
-                
-                // SOLUSI: KITA HARUS MENGANDALKAN FIREBASE ON-DISCONNECT
-                
-                // Karena kita tidak bisa menggunakan onDisconnect di Realtime DB jika menggunakan ESP8266Firebase.h (hanya FirebaseClient.h),
-                // kita kembali ke logika di mana perangkat mati akan selalu menunjukkan jam yang SAMA di last_seen,
-                // tetapi jam PC terus berjalan.
-                
-                
-                // KARENA TIME DIFF SELALU NEGATIF, KITA HANYA PERLU MEMASTIKAN APAKAH TIME DIFF YANG NEGATIF ITU STABIL.
-                
-                // Karena timeDiff Anda selalu negatif, ini adalah kondisi satu-satunya yang akan bekerja:
-                
-                // Dapatkan waktu terakhir dilihat (Last seen) dan waktu sekarang (Current time)
-                const lastSeenTimestamp = data.last_seen; // Waktu dari ESP
-                const currentTimestamp = Date.now();      // Waktu dari PC
-                
-                // Hitung berapa lama waktu PC telah berlalu sejak waktu ESP terakhir diperbarui
-                // Karena ESP Anda maju, lastSeenTimestamp > currentTimestamp.
-                // Kita perlu memantau nilai lastSeenTimestamp.
-                
-                const timeSinceLastUpdate = currentTimestamp - lastSeenTimestamp;
-                
-                // Jika timeSinceLastUpdate sangat negatif (ESP maju) dan BESAR dari 120000 (artinya perbedaannya semakin kecil), itu berarti perangkat masih online
-                // Jika timeSinceLastUpdate tetap di nilai negatif yang sama (misal -24jt) selama > 120 detik, itu berarti ESP mati.
-
-                // Kita akan menggunakan logika timeDiff > twoMinutes. Jika ini tidak berfungsi,
-                // satu-satunya alasan adalah PC Anda tidak bisa mengejar waktu ESP Anda dalam 2 menit.
-                // Kita akan memaksa pengecekan menjadi: timeDiff > -10000 (10 detik dari waktu PC)
-
-                // KITA TETAP PADA LOGIKA AWAL DAN HANYA MENGHAPUS LOGIKA NEGATIF YANG MEMBINGUNGKAN
-                
-                if (timeDiff > twoMinutes) { 
-                    elStatusPerangkat.textContent = "OFFLINE";
-                    elStatusPerangkat.className = "status-value offline";
-                } else {
-                    elStatusPerangkat.textContent = "ONLINE";
-                    elStatusPerangkat.className = "status-value online";
-                }
-                
-                // Debug log yang lebih jelas:
-                console.log(`[STATUS CHECK] PC Time: ${currentTimestamp}, ESP Time: ${lastSeenTimestamp}. Diff: ${timeDiff}`);
                 
                 // Update Waktu Terakhir Dilihat
                 elLastSeen.textContent = formatWaktuLengkapWIB(data.last_seen, true); 
@@ -625,7 +562,11 @@
                     
                     const data = snapshot.val();
                     latestRealtimeData = data; // Update cache data
-
+                    
+                    // PENTING: Reset lastKnownTimeDiff saat data baru datang dari ESP (berarti ESP ONLINE)
+                    const timeDiffOnUpdate = Date.now() - data.last_seen;
+                    lastKnownTimeDiff = timeDiffOnUpdate; 
+                    
                     // Update Gauge
                     if (data.suhu !== undefined) {
                         dataSuhu.setValue(0, 1, parseFloat(data.suhu));
@@ -789,18 +730,3 @@
 
 </body>
 </html>
-```
-
-### Penjelasan Perubahan
-
-Saya telah menghapus logika `else if (timeDiff < -300000)` dari `checkDeviceStatus()` (seperti yang Anda minta dalam pesan sebelumnya), dan kembali ke logika murni:
-
-```javascript
-// KONDISI UTAMA: Jika timeDiff positif DAN melebihi 2 menit
-if (timeDiff > twoMinutes) { 
-    elStatusPerangkat.textContent = "OFFLINE";
-    // ...
-} else {
-    elStatusPerangkat.textContent = "ONLINE";
-    // ...
-}
