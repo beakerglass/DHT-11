@@ -470,10 +470,18 @@
                 // DEBUG LOG: Kritis untuk melihat apakah timeDiff bertambah
                 console.log(`[STATUS CHECK] Time difference (ms): ${timeDiff}. Threshold: ${twoMinutes}`);
                 
+                // KONDISI UTAMA: Jika timeDiff positif DAN melebihi 2 menit
                 if (timeDiff > twoMinutes) { 
                     elStatusPerangkat.textContent = "OFFLINE";
                     elStatusPerangkat.className = "status-value offline";
-                } else {
+                } 
+                // KONDISI BARU: Jika timeDiff sangat negatif (Waktu ESP jauh di depan)
+                else if (timeDiff < -300000) { // Jika bedanya lebih dari 5 menit negatif
+                    elStatusPerangkat.textContent = "OFFLINE (Waktu ESP Terlalu Cepat)";
+                    elStatusPerangkat.className = "status-value offline";
+                }
+                // Jika tidak memenuhi kedua kondisi di atas, berarti perangkat ONLINE/Baru mengirim data
+                else {
                     elStatusPerangkat.textContent = "ONLINE";
                     elStatusPerangkat.className = "status-value online";
                 }
