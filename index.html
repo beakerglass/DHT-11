@@ -457,21 +457,22 @@
         
         // --- Fungsi untuk memperbarui status berdasarkan cache data ---
         function checkDeviceStatus() {
-            // Logika Sederhana: Hanya bisa ONLINE jika Firebase update kurang dari 2 menit
+            // Logika Sederhana: Hanya bisa ONLINE jika Firebase update kurang dari batas waktu
             const timeSinceLastFirebaseUpdate = Date.now() - lastFirebaseUpdateTimestamp;
-            const twoMinutes = 120000; // 2 menit dalam milidetik
+            // PERUBAHAN KRITIS: Mengurangi waktu tunggu dari 120 detik menjadi 30 detik
+            const maxWaitTime = 30000; // 30 detik dalam milidetik
 
             // DEBUG LOG
-            console.log(`[STATUS CHECK] TimeSinceUpdate: ${timeSinceLastFirebaseUpdate} ms. Threshold: ${twoMinutes} ms`);
+            console.log(`[STATUS CHECK] TimeSinceUpdate: ${timeSinceLastFirebaseUpdate} ms. Threshold: ${maxWaitTime} ms`);
             
             
             // KONDISI UTAMA: LOGIKA TIMEOUT
-            // Jika sudah lebih dari 2 menit sejak Firebase Listener terakhir diaktifkan
-            if (timeSinceLastFirebaseUpdate > twoMinutes) {
+            // Jika sudah lebih dari batas waktu sejak Firebase Listener terakhir diaktifkan
+            if (timeSinceLastFirebaseUpdate > maxWaitTime) {
                 elStatusPerangkat.textContent = "OFFLINE";
                 elStatusPerangkat.className = "status-value offline";
             } else {
-                // Jika masih dalam batas 2 menit sejak data terakhir diterima
+                // Jika masih dalam batas waktu sejak data terakhir diterima
                 elStatusPerangkat.textContent = "ONLINE";
                 elStatusPerangkat.className = "status-value online";
             }
@@ -516,9 +517,11 @@
                     // PENTING: Update timestamp HANYA JIKA ADA PERUBAHAN DATA (bukan hanya koneksi ulang Firebase)
                     if (isNewData) {
                        lastFirebaseUpdateTimestamp = Date.now();
+                       console.log("Firebase Update DETECTED. Resetting timer.");
                     } else if (lastFirebaseUpdateTimestamp === 0) {
                         // Jika ini adalah koneksi awal dan data ada, set timestamp pertama kali
                         lastFirebaseUpdateTimestamp = Date.now();
+                        console.log("Initial Firebase connection established.");
                     }
                     
                     // Update Gauge
